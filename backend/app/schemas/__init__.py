@@ -1,0 +1,52 @@
+from app.schemas.ai import (
+    RequirementExtracted,
+    RequirementExtractionResponse,
+    EvidenceCandidate,
+    EvidenceRetrievalResponse,
+    RequirementMappingItem,
+    RequirementMappingResponse,
+    UnsupportedClaimItem,
+    UnsupportedClaimResponse,
+    ClarificationQuestionItem,
+    ClarificationQuestionResponse,
+    PipelineAuditSnapshot,
+)
+from app.schemas.score import DeterministicScoreBreakdown
+from app.schemas.review import ReviewSubmissionRequest, ReviewSubmissionResponse
+from app.schemas.assessment import (
+    AssessmentCreate,
+    AssessmentListItem,
+    AssessmentDetailOut,
+    RequirementDetailOut,
+    DocumentVersionOut,
+    SupportingDocCreate,
+    SupportingDocUpdate,
+    SupportingDocOut,
+    ReviewedSummaryReportOut,
+)
+
+__all__ = [
+    "RequirementExtracted",
+    "RequirementExtractionResponse",
+    "EvidenceCandidate",
+    "EvidenceRetrievalResponse",
+    "RequirementMappingItem",
+    "RequirementMappingResponse",
+    "UnsupportedClaimItem",
+    "UnsupportedClaimResponse",
+    "ClarificationQuestionItem",
+    "ClarificationQuestionResponse",
+    "PipelineAuditSnapshot",
+    "DeterministicScoreBreakdown",
+    "ReviewSubmissionRequest",
+    "ReviewSubmissionResponse",
+    "AssessmentCreate",
+    "AssessmentListItem",
+    "AssessmentDetailOut",
+    "RequirementDetailOut",
+    "DocumentVersionOut",
+    "SupportingDocCreate",
+    "SupportingDocUpdate",
+    "SupportingDocOut",
+    "ReviewedSummaryReportOut",
+]
