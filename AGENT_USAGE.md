@@ -57,6 +57,7 @@ During development, several critical mistakes and sub-optimal suggestions were c
 | **Overwriting Historical Document Files on Disk**: Agent originally saved files using `storage_path = f"{doc_type}_{filename}"`. | Re-uploading a file with the same name erased previous version binaries. | Updated file naming schema to `{assessment_id}_{doc_type}_v{next_version}_{filename}`, ensuring historical document versions remain indefinitely preserved. |
 | **Re-analysis Mutating In-Place**: Agent initially reset the existing assessment record upon re-analysis. | Erased previous reviewer notes and audit history. | Implemented run branching: `reanalyze_assessment` archives the existing run and creates a new assessment run (`parent_assessment_id = prev.id`, `run_number = prev.run_number + 1`), preserving the previous run for auditability. |
 | **Windows Env Var Conflict (`DEBUG=release`)**: Pydantic crashed during app startup because host OS had `DEBUG=release`. | Server crashed on startup due to strict bool parsing error. | Added a custom Pydantic `@field_validator` in `config.py` that safely parses string variants or non-boolean environment inputs. |
+| **Silent 0-Requirement Output on Non-Benchmark Guidelines**: When test PDF guidelines (Indian Green Innovation) were uploaded, the mock LLM returned CleanTech requirements which were discarded due to strict page grounding, silently resulting in 0 requirements and reaching ANALYZED. | Critical bug where assessment reached ANALYZED with 0 requirements and 0% score without error. | Upgraded `MockLLMClient` with dynamic extraction across arbitrary text and test PDFs; enhanced `RequirementExtractor` with token-overlap and full-text grounding; enforced `DocumentProcessingError` for unreadable text (< 50 chars); and enforced that zero requirements transitions the assessment to `ANALYSIS_FAILED` with HTTP 422 rather than `ANALYZED`. |
 
 ---
 
@@ -65,13 +66,14 @@ During development, several critical mistakes and sub-optimal suggestions were c
 To ensure system reliability, the implementation was verified across multiple dimensions:
 
 1. **Automated Pytest Suite**:
-   * **134+ tests passing** in `backend/tests/`:
+   * **146 tests passing** across 11 test modules in `backend/tests/`:
+     * `test_regression_pipeline.py`: 8 dedicated regression tests verifying non-zero requirement extraction, zero-requirement rejection (`ANALYSIS_FAILED`), corrupted PDF rejection, image-only/blank PDF rejection, database persistence count match, mapping coverage, deterministic score formula, and structured log emissions.
      * `test_parser.py`: PDF, DOCX, TXT parsing, empty file validation, format errors, hash determinism.
      * `test_schemas.py`: Strict schema validation for requirements, mappings, claims, and questions.
      * `test_scoring.py`: Deterministic scoring rules, mandatory vs recommendation isolation, reviewer override matrix (confirm, correct, reject).
      * `test_versioning_and_stale.py`: Version numbers ($v_1 \to v_2$), unchanged document duplicate protection, stale triggers on guideline/application updates, multi-version preservation, and re-analysis audit runs.
      * `test_ai_services.py` & `test_pipeline_and_validation.py`: Anti-hallucination citation checks, gap-derived question generation, unsupported claim wording, retry handling.
-     * `test_logging.py`: Structured event emission for all 12 core workflow events and sensitive data redaction.
+     * `test_logging.py`: Structured event emission for core workflow events and sensitive data redaction.
      * `test_api_endpoints.py`: All REST API routes, input validation, and HTTP status codes (200, 201, 400, 404, 409, 413, 415, 422).
      * `test_e2e_workflow.py`: Complete lifecycle integration test from assessment creation through document replacement and re-analysis.
 

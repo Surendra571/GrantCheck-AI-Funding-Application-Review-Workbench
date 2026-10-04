@@ -268,18 +268,19 @@ The test suite contains **138 automated backend tests** verifying the parsing en
 python -m pytest -c backend/pytest.ini backend/tests -v
 ```
 
-### Test Suite Breakdown (138 Tests)
+### Test Suite Breakdown (146 Tests)
 
 | Test Module | Test Count | Verifications & Coverage |
 | :--- | :---: | :--- |
 | `tests/test_scoring.py` | **60** | Exhaustive testing of deterministic scoring matrix; all AI statuses (`SUPPORTED`, `WEAK`, `MISSING`, `AMBIGUOUS`); reviewer overrides (`CONFIRMED`, `CORRECTED`, `REJECTED`); isolation of recommendations; rounding and edge cases. |
+| `tests/test_pipeline_and_validation.py` | **19** | Multi-step pipeline execution; verbatim quote validation; override of hallucinated or missing citations to `MISSING`; non-judgmental unsupported claim classification; malformed LLM response handling. |
 | `tests/test_api_endpoints.py` | **18** | REST endpoint lifecycles; file upload validations (size limit, file formats, empty files); review actions (mandating reviewer notes); supporting documents CRUD; error handling (400, 404, 409, 413, 415, 422). |
 | `tests/test_versioning_and_stale.py` | **13** | SHA-256 hash calculations; sequential version increments ($v_1 \to v_2$); duplicate upload prevention; automatic stale flagging when guideline, application, or both change; re-analysis branching. |
-| `tests/test_pipeline_and_validation.py` | **12** | Multi-step pipeline execution; verbatim quote validation; override of hallucinated or missing citations to `MISSING`; non-judgmental unsupported claim classification; malformed LLM response handling. |
-| `tests/test_schemas.py` | **12** | Pydantic v2 schema validations for requirements, mappings, evidence types, review actions, and summary structures. |
-| `tests/test_ai_services.py` | **11** | Requirement extraction logic; evidence retriever; mock LLM determinism; retry handling on transient network failures; provider error sanitization. |
-| `tests/test_parser.py` | **8** | PyMuPDF page-by-page PDF extraction; `python-docx` section parsing; plain text handling; empty file rejection; unsupported file format guards. |
-| `tests/test_logging.py` | **3** | Structured JSON logging validation across 12 lifecycle events; automated sanitization of sensitive API keys and tokens (`sanitize_data`). |
+| `tests/test_parser.py` | **10** | PyMuPDF page-by-page PDF extraction; `python-docx` section parsing; plain text handling; empty file rejection; unsupported file format guards; whitespace detection. |
+| `tests/test_regression_pipeline.py` | **8** | Dedicated regression testing for non-zero requirement extraction on benchmark PDFs; zero-requirement rejection (`ANALYSIS_FAILED`); corrupted and image-only PDF rejection; database persistence count matching; mapping coverage; deterministic score formula; and structured log emissions. |
+| `tests/test_ai_services.py` | **7** | Requirement extraction logic; evidence retriever; mock LLM determinism; retry handling on transient network failures; provider error sanitization. |
+| `tests/test_schemas.py` | **7** | Pydantic v2 schema validations for requirements, mappings, evidence types, review actions, and summary structures. |
+| `tests/test_logging.py` | **3** | Structured JSON logging validation across core lifecycle events; automated sanitization of sensitive API keys and tokens (`sanitize_data`). |
 | `tests/test_e2e_workflow.py` | **1** | Full end-to-end integration flow: $\text{Create} \to \text{Upload} \to \text{AI Analyze} \to \text{Review Overrides} \to \text{Score} \to \text{Summary} \to \text{Stale Re-analysis}$. |
 
 ---
