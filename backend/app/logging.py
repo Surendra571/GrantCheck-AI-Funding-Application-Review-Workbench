@@ -57,3 +57,4 @@ def log_event(
         payload["details"] = sanitize_data(details)
 
     logger.log(level, f"[{event}] {json.dumps(payload)}")
+

@@ -65,3 +65,4 @@ def test_all_twelve_core_structured_events_callable(caplog):
     captured_text = caplog.text
     for ev in events:
         assert f"[{ev}]" in captured_text
+

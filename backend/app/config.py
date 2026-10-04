@@ -33,6 +33,15 @@ class Settings(BaseSettings):
     # Database
     DATABASE_URL: str = "sqlite:///./grantcheck.db"
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def fix_postgres_prefix(cls, v: Any) -> Any:
+        if isinstance(v, str) and v.startswith("postgres://"):
+            return v.replace("postgres://", "postgresql://", 1)
+        return v
+
+    FRONTEND_URL: str = ""
+
     # LLM Provider: 'mock', 'openai', 'gemini'
     LLM_PROVIDER: str = "mock"
     OPENAI_API_KEY: str = ""

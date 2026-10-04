@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: grantcheck-api
+    runtime: python
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: grantcheck-db
+          property: connectionString
+      - key: LLM_PROVIDER
+        value: mock
+      - key: FRONTEND_URL
+        sync: false
+      - key: PYTHON_VERSION
+        value: 3.12.0
+
+databases:
+  - name: grantcheck-db
+    databaseName: grantcheck
+    user: grantcheck_user
+    plan: free
+

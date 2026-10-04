@@ -8,7 +8,8 @@ import {
   MappingStatus,
 } from '../types';
 
-const BASE_URL = '/api';
+const API_HOST = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/, '') || '';
+const BASE_URL = API_HOST ? `${API_HOST}/api` : '/api';
 
 export class ApiError extends Error {
   status: number;
