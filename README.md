@@ -9,8 +9,8 @@
 ## Live Demo
 
 * **Frontend**: https://grant-check-ai-funding-application-review-workbench-p1qvvqt6t.vercel.app/
-* **Backend API**: `https://grantcheck-ai-funding-application-review-puqz.onrender.com/`
-* **Health Check**: `https://grantcheck-ai-funding-application-review-puqz.onrender.com/health`
+* **Backend API**: https://grantcheck-ai-funding-application-review-puqz.onrender.com/
+* **Health Check**: https://grantcheck-ai-funding-application-review-puqz.onrender.com/health
 
 ### Recommended Evaluator Flow
 
