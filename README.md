@@ -8,7 +8,7 @@
 
 ## Live Demo
 
-* **Frontend**: `Frontend: Pending final deployment`
+* **Frontend**: https://grant-check-ai-funding-application-review-workbench-p1qvvqt6t.vercel.app/
 * **Backend API**: `https://grantcheck-ai-funding-application-review-puqz.onrender.com/`
 * **Health Check**: `https://grantcheck-ai-funding-application-review-puqz.onrender.com/health`
 
@@ -294,6 +294,7 @@ The codebase is configured for cloud deployment across Render, Vercel, and GitHu
 * **CORS Support**: Configured dynamically in [`backend/app/main.py`](file:///d:/FDE_ASSIGNMENTS/GrantCheck-AI-Funding-Application-Review-Workbench/backend/app/main.py) with regex matching all Vercel deployment URLs (`r"^https:\/\/.*\.vercel\.app$"`).
 
 ### Frontend on Vercel
+* **Live Deployment**: https://grant-check-ai-funding-application-review-workbench-p1qvvqt6t.vercel.app/
 * **SPA Routing**: Configured in [`frontend/vercel.json`](file:///d:/FDE_ASSIGNMENTS/GrantCheck-AI-Funding-Application-Review-Workbench/frontend/vercel.json) to rewrite all routes to `/index.html`.
 * **Dynamic Backend Binding**: [`frontend/src/api/client.ts`](file:///d:/FDE_ASSIGNMENTS/GrantCheck-AI-Funding-Application-Review-Workbench/frontend/src/api/client.ts) detects `VITE_API_BASE_URL` with seamless fallback to `/api` for local proxying.
 
