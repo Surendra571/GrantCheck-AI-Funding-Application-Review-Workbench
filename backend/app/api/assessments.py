@@ -18,9 +18,11 @@ from app.schemas.assessment import (
     DocumentVersionOut,
     SupportingDocOut,
 )
+from app.services.parser import DocumentProcessingError
 from app.services.llm_client import get_llm_client
 from app.services.pipeline_orchestrator import PipelineOrchestrator
 from app.services.scoring_service import ScoringService
+from app.logging import log_event
 
 logger = logging.getLogger(__name__)
 
@@ -203,8 +205,14 @@ def _execute_pipeline_for_assessment(assessment: Assessment, g_doc: DocumentVers
         db.query(ClarificationQuestion).filter(ClarificationQuestion.assessment_id == assessment.id).delete()
 
         # Save requirements and mappings
-        extracted_reqs = pipeline_res["requirements"]
-        verified_mappings = pipeline_res["mappings"]
+        extracted_reqs = pipeline_res.get("requirements", [])
+        if not extracted_reqs:
+            raise DocumentProcessingError(
+                f"We couldn't identify any actionable requirements from '{g_doc.filename}'. "
+                "Please ensure the document contains clear grant guidelines or eligibility criteria."
+            )
+
+        verified_mappings = pipeline_res.get("mappings", [])
         map_by_id = {m.requirement_id: m for m in verified_mappings}
 
         for r_item in extracted_reqs:
@@ -239,7 +247,7 @@ def _execute_pipeline_for_assessment(assessment: Assessment, g_doc: DocumentVers
                 db.add(mapping_db)
 
         # Save unsupported claims
-        for c in pipeline_res["unsupported_claims"]:
+        for c in pipeline_res.get("unsupported_claims", []):
             claim_db = UnsupportedClaim(
                 assessment_id=assessment.id,
                 claim=c.claim,
@@ -251,7 +259,7 @@ def _execute_pipeline_for_assessment(assessment: Assessment, g_doc: DocumentVers
             db.add(claim_db)
 
         # Save clarification questions
-        for q in pipeline_res["clarification_questions"]:
+        for q in pipeline_res.get("clarification_questions", []):
             q_db = ClarificationQuestion(
                 assessment_id=assessment.id,
                 requirement_id=q.requirement_id,
@@ -260,6 +268,17 @@ def _execute_pipeline_for_assessment(assessment: Assessment, g_doc: DocumentVers
                 suggested_evidence=q.suggested_evidence,
             )
             db.add(q_db)
+
+        # Persistence verification: ensure all extracted requirements were successfully persisted
+        persisted_req_count = db.query(Requirement).filter(Requirement.assessment_id == assessment.id).count()
+        if persisted_req_count != len(extracted_reqs):
+            db.rollback()
+            assessment.status = "ANALYSIS_FAILED"
+            db.commit()
+            raise HTTPException(
+                status_code=500,
+                detail=f"Persistence mismatch: {len(extracted_reqs)} requirements extracted but {persisted_req_count} persisted."
+            )
 
         assessment.guideline_version = g_doc.version_number
         assessment.application_version = a_doc.version_number
@@ -270,14 +289,51 @@ def _execute_pipeline_for_assessment(assessment: Assessment, g_doc: DocumentVers
         db.commit()
         db.refresh(assessment)
 
+        # Completeness calculation & structured logging
+        score = ScoringService.calculate_score(assessment.requirements, assessment.supporting_documents)
+        log_event(
+            event="completeness_calculated",
+            assessment_id=assessment.id,
+            details={
+                "completion_percentage": score.completion_percentage,
+                "mandatory_completed": score.mandatory_completed,
+                "total_mandatory": score.total_mandatory,
+            },
+        )
+        log_event(
+            event="analysis_completed",
+            assessment_id=assessment.id,
+            details={
+                "requirements_count": persisted_req_count,
+                "score": score.completion_percentage,
+            },
+        )
+
+    except DocumentProcessingError as e:
+        db.rollback()
+        assessment.status = "ANALYSIS_FAILED"
+        db.commit()
+        log_event(
+            event="analysis_failed",
+            assessment_id=assessment.id,
+            status="failed",
+            level=logging.ERROR,
+            details={"error": str(e)},
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=str(e),
+        )
     except Exception as e:
         db.rollback()
         assessment.status = "ERROR"
         db.commit()
-        logger.error(
-            "Pipeline analysis failed for assessment %s (%s)",
-            assessment.id,
-            type(e).__name__,
+        log_event(
+            event="analysis_failed",
+            assessment_id=assessment.id,
+            status="error",
+            level=logging.ERROR,
+            details={"error": str(e), "error_type": type(e).__name__},
         )
         raise HTTPException(
             status_code=500,

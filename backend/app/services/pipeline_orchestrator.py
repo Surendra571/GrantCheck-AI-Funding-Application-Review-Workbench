@@ -10,6 +10,8 @@ from app.services.evidence_checker import EvidenceChecker
 from app.services.question_generator import QuestionGenerator
 from app.schemas.ai import PipelineAuditSnapshot
 
+from app.logging import log_event
+
 logger = logging.getLogger(__name__)
 
 class PipelineOrchestrator:
@@ -28,39 +30,71 @@ class PipelineOrchestrator:
         application_filename: str
     ) -> Dict[str, Any]:
         # Step 1: Parse Guideline
-        logger.info(f"Step 1: Parsing guideline '{guideline_filename}'...")
         guideline_doc: ParsedDocument = DocumentParser.parse(guideline_bytes, guideline_filename)
+        log_event(
+            event="document_parsed",
+            details={"doc_type": "guideline", "filename": guideline_filename, "pages": guideline_doc.page_count},
+        )
+        log_event(
+            event="text_extracted",
+            details={"doc_type": "guideline", "filename": guideline_filename, "char_count": len(guideline_doc.full_text)},
+        )
 
         # Step 2: Extract Requirements
-        logger.info("Step 2: Extracting structured requirements...")
         requirements = self.extractor.extract(guideline_doc)
 
         # Step 3: Parse Application
-        logger.info(f"Step 3: Parsing application '{application_filename}'...")
         application_doc: ParsedDocument = DocumentParser.parse(application_bytes, application_filename)
+        log_event(
+            event="document_parsed",
+            details={"doc_type": "application", "filename": application_filename, "pages": application_doc.page_count},
+        )
+        log_event(
+            event="text_extracted",
+            details={"doc_type": "application", "filename": application_filename, "char_count": len(application_doc.full_text)},
+        )
 
         # Step 4: Retrieve Relevant Application Evidence
-        logger.info("Step 4: Retrieving evidence candidates...")
         candidates = EvidenceRetriever.retrieve_candidates(requirements, application_doc)
 
         # Step 5: Map Evidence to Requirements
-        logger.info("Step 5: Mapping evidence to requirements...")
+        log_event(
+            event="mapping_started",
+            details={"requirement_count": len(requirements)},
+        )
         raw_mappings = self.mapper.map_requirements(requirements, application_doc, candidates)
 
         # Step 6: Anti-Hallucination Citation Verification
-        logger.info("Step 6: Verifying citations and detecting weak/missing evidence...")
         verified_mappings = CitationVerifier.verify_mappings(raw_mappings, application_doc)
+        supported_count = sum(1 for m in verified_mappings if m.status == "SUPPORTED")
+        weak_count = sum(1 for m in verified_mappings if m.status in ("WEAK", "AMBIGUOUS"))
+        missing_count = sum(1 for m in verified_mappings if m.status == "MISSING")
+        log_event(
+            event="mapping_completed",
+            details={
+                "total_mappings": len(verified_mappings),
+                "supported": supported_count,
+                "weak": weak_count,
+                "missing": missing_count,
+            },
+        )
 
         # Step 7: Detect Unsupported Claims
-        logger.info("Step 7: Detecting unsupported claims...")
         unsupported_claims = self.checker.check_claims(application_doc, requirements, verified_mappings)
+        log_event(
+            event="unsupported_claims_detected",
+            details={"unsupported_count": len(unsupported_claims)},
+        )
 
         # Step 8: Generate Clarification Questions
-        logger.info("Step 8: Generating clarification questions...")
         clarification_questions = self.question_gen.generate_questions(
             requirements,
             verified_mappings,
             unsupported_claims,
+        )
+        log_event(
+            event="questions_generated",
+            details={"question_count": len(clarification_questions)},
         )
 
         # Construct full audit snapshot

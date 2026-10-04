@@ -96,7 +96,7 @@ export interface AssessmentDetail {
   title: string;
   grant_name: string;
   application_name: string;
-  status: 'DRAFT' | 'ANALYZING' | 'ANALYZED' | 'ERROR';
+  status: 'DRAFT' | 'ANALYZING' | 'ANALYZED' | 'ANALYSIS_FAILED' | 'ERROR';
   is_stale: boolean;
   stale_reason?: string | null;
   raw_analysis_payload?: any;

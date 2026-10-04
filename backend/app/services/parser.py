@@ -4,6 +4,12 @@ from typing import List, Dict, Any
 import fitz  # PyMuPDF
 from docx import Document as DocxDocument
 
+class DocumentProcessingError(ValueError):
+    """Raised when document parsing fails or extracts insufficient text."""
+    pass
+
+MIN_TEXT_LENGTH = 50
+
 class ParsedDocument:
     def __init__(
         self,
@@ -29,7 +35,10 @@ class DocumentParser:
     @classmethod
     def parse(cls, file_bytes: bytes, filename: str) -> ParsedDocument:
         if not file_bytes:
-            raise ValueError(f"Empty document: {filename} contains 0 bytes.")
+            raise DocumentProcessingError(
+                f"Empty document: '{filename}' contains 0 bytes. "
+                "We couldn't extract readable text from the guideline. Please upload a text-based PDF or DOCX."
+            )
 
         file_hash = cls.compute_sha256(file_bytes)
         ext = os.path.splitext(filename)[1].lower()
@@ -66,7 +75,15 @@ class DocumentParser:
 
         full_text = "\n\n".join(full_text_parts)
         if not full_text.strip():
-            raise ValueError(f"PDF document '{filename}' contains no extractable text.")
+            raise DocumentProcessingError(
+                f"PDF document '{filename}' contains no extractable text. "
+                "We couldn't extract readable text from the guideline. Please upload a text-based PDF or DOCX."
+            )
+        if len(full_text.strip()) < MIN_TEXT_LENGTH:
+            raise DocumentProcessingError(
+                f"PDF document '{filename}' contains no extractable text (insufficient readable characters). "
+                "We couldn't extract readable text from the guideline. Please upload a text-based PDF or DOCX."
+            )
 
         return ParsedDocument(
             filename=filename,
@@ -82,7 +99,7 @@ class DocumentParser:
         try:
             doc = DocxDocument(io.BytesIO(file_bytes))
         except Exception as e:
-            raise ValueError(f"Corrupted or invalid DOCX file '{filename}': {str(e)}")
+            raise DocumentProcessingError(f"Corrupted or invalid DOCX file '{filename}': {str(e)}")
 
         full_text_parts: List[str] = []
         sections: List[str] = []
@@ -96,7 +113,15 @@ class DocumentParser:
 
         full_text = "\n\n".join(full_text_parts)
         if not full_text.strip():
-            raise ValueError(f"DOCX document '{filename}' contains no extractable text.")
+            raise DocumentProcessingError(
+                f"DOCX document '{filename}' contains no extractable text. "
+                "We couldn't extract readable text from the guideline. Please upload a text-based PDF or DOCX."
+            )
+        if len(full_text.strip()) < MIN_TEXT_LENGTH:
+            raise DocumentProcessingError(
+                f"DOCX document '{filename}' contains no extractable text (insufficient readable characters). "
+                "We couldn't extract readable text from the guideline. Please upload a text-based PDF or DOCX."
+            )
 
         # Estimate pages based on word count (~400 words per page)
         words = len(full_text.split())
@@ -134,10 +159,13 @@ class DocumentParser:
             try:
                 full_text = file_bytes.decode("latin-1")
             except Exception as e:
-                raise ValueError(f"Unable to decode text document '{filename}': {str(e)}")
+                raise DocumentProcessingError(f"Unable to decode text document '{filename}': {str(e)}")
 
         if not full_text.strip():
-            raise ValueError(f"Text document '{filename}' is empty.")
+            raise DocumentProcessingError(
+                f"Text document '{filename}' is empty. "
+                "We couldn't extract readable text from the guideline. Please upload a text-based PDF or DOCX."
+            )
 
         sections = cls._extract_sections_from_text(full_text)
         words = len(full_text.split())

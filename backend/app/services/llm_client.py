@@ -28,68 +28,211 @@ class MockLLMClient(BaseLLMClient):
     """Zero-dependency grounded deterministic mock client for offline tests and benchmarks."""
 
     def generate_structured(self, prompt: str, system_prompt: str, schema: Type[T]) -> T:
+        import re
+
         if schema == RequirementExtractionResponse:
-            return schema(
-                requirements=[
-                    RequirementExtracted(
-                        id="REQ-001",
-                        text="The lead applicant must be a UK-registered SME operating for at least 12 months.",
-                        type="eligibility-related",
-                        mandatory=True,
-                        category="eligibility",
-                        source_document="guideline",
-                        source_page=1,
-                        source_section="1. Eligibility Criteria",
-                        source_excerpt="The lead applicant must be a UK-registered SME operating for at least 12 months."
-                    ),
-                    RequirementExtracted(
-                        id="REQ-002",
-                        text="Applications must include audited financial statements for the previous two financial years.",
-                        type="mandatory",
-                        mandatory=True,
-                        category="financial",
-                        source_document="guideline",
-                        source_page=1,
-                        source_section="2. Financial Documentation",
-                        source_excerpt="Applications must include audited financial statements for the previous two financial years."
-                    ),
-                    RequirementExtracted(
-                        id="REQ-003",
-                        text="Projects must achieve a minimum 40% reduction in carbon emissions verified by life-cycle analysis.",
-                        type="mandatory",
-                        mandatory=True,
-                        category="project",
-                        source_document="guideline",
-                        source_page=1,
-                        source_section="3. Technical & Environmental Impact",
-                        source_excerpt="Projects must achieve a minimum 40% reduction in carbon emissions verified by life-cycle analysis."
-                    ),
-                    RequirementExtracted(
-                        id="REQ-004",
-                        text="Applicants should provide letters of support from at least two commercial pilot partners.",
-                        type="recommendation",
-                        mandatory=False,
-                        category="recommendation",
-                        source_document="guideline",
-                        source_page=1,
-                        source_section="4. Commercial Partner Validation",
-                        source_excerpt="Applicants should provide letters of support from at least two commercial pilot partners."
-                    ),
-                    RequirementExtracted(
-                        id="REQ-005",
-                        text="A full risk assessment matrix identifying at least five technological and market risks with mitigation protocols must be included in Section D of the proposal narrative.",
-                        type="mandatory",
-                        mandatory=True,
-                        category="submission",
-                        source_document="guideline",
-                        source_page=1,
-                        source_section="5. Risk Assessment & Governance",
-                        source_excerpt="A full risk assessment matrix identifying at least five technological and market risks with mitigation protocols must be included in Section D of the proposal narrative."
-                    ),
-                ]
+            # 1. Check for explicit REQ/REC tags in the prompt text
+            req_rec_pattern = re.compile(
+                r'(REQ-\d+|REC-\d+)[^\w\n]*([^\n\r]+(?:\n(?![A-Z0-9\n\r\t]+[—\-\:\.]|\d+\.)[^\n\r]+)?)',
+                re.IGNORECASE
             )
+            matches = list(req_rec_pattern.finditer(prompt))
+            if matches:
+                reqs = []
+                for m in matches:
+                    req_id = m.group(1).upper()
+                    content = m.group(2).strip()
+                    content = re.sub(r'^[—\-:\s]+', '', content).strip()
+                    is_rec = req_id.startswith("REC") or "encourage" in content.lower() or "recommend" in content.lower()
+                    req_type = (
+                        "recommendation" if is_rec
+                        else ("eligibility-related" if "eligib" in content.lower()
+                        else ("submission-related" if any(w in content.lower() for w in ["timeline", "submission", "plan", "milestone"])
+                        else "mandatory"))
+                    )
+                    cat = (
+                        "recommendation" if is_rec
+                        else ("eligibility" if "eligib" in content.lower()
+                        else ("financial" if any(w in content.lower() for w in ["budget", "inr", "cost", "financial", "audit"])
+                        else ("project" if any(w in content.lower() for w in ["scope", "environmental", "emission", "energy"])
+                        else "submission")))
+                    )
+                    reqs.append(
+                        RequirementExtracted(
+                            id=req_id,
+                            text=content,
+                            type=req_type,
+                            mandatory=not is_rec,
+                            category=cat,
+                            source_document="guideline",
+                            source_page=1,
+                            source_section="Mandatory Eligibility Requirements" if not is_rec else "Recommended Information",
+                            source_excerpt=content,
+                        )
+                    )
+                return schema(requirements=reqs)
+
+            # 2. Check for CleanTech Horizon guideline text
+            if "cleantech" in prompt.lower() or "fewer than 250 employees" in prompt.lower() or "ecofilter" in prompt.lower():
+                return schema(
+                    requirements=[
+                        RequirementExtracted(
+                            id="REQ-001",
+                            text="The lead applicant must be a UK-registered SME operating for at least 12 months.",
+                            type="eligibility-related",
+                            mandatory=True,
+                            category="eligibility",
+                            source_document="guideline",
+                            source_page=1,
+                            source_section="1. Eligibility Criteria",
+                            source_excerpt="The lead applicant must be a UK-registered SME operating for at least 12 months."
+                        ),
+                        RequirementExtracted(
+                            id="REQ-002",
+                            text="Applications must include audited financial statements for the previous two financial years.",
+                            type="mandatory",
+                            mandatory=True,
+                            category="financial",
+                            source_document="guideline",
+                            source_page=1,
+                            source_section="2. Financial Documentation",
+                            source_excerpt="Applications must include audited financial statements for the previous two financial years."
+                        ),
+                        RequirementExtracted(
+                            id="REQ-003",
+                            text="Projects must achieve a minimum 40% reduction in carbon emissions verified by life-cycle analysis.",
+                            type="mandatory",
+                            mandatory=True,
+                            category="project",
+                            source_document="guideline",
+                            source_page=1,
+                            source_section="3. Technical & Environmental Impact",
+                            source_excerpt="Projects must achieve a minimum 40% reduction in carbon emissions verified by life-cycle analysis."
+                        ),
+                        RequirementExtracted(
+                            id="REQ-004",
+                            text="Applicants should provide letters of support from at least two commercial pilot partners.",
+                            type="recommendation",
+                            mandatory=False,
+                            category="recommendation",
+                            source_document="guideline",
+                            source_page=1,
+                            source_section="4. Commercial Partner Validation",
+                            source_excerpt="Applicants should provide letters of support from at least two commercial pilot partners."
+                        ),
+                        RequirementExtracted(
+                            id="REQ-005",
+                            text="A full risk assessment matrix identifying at least five technological and market risks with mitigation protocols must be included in Section D of the proposal narrative.",
+                            type="mandatory",
+                            mandatory=True,
+                            category="submission",
+                            source_document="guideline",
+                            source_page=1,
+                            source_section="5. Risk Assessment & Governance",
+                            source_excerpt="A full risk assessment matrix identifying at least five technological and market risks with mitigation protocols must be included in Section D of the proposal narrative."
+                        ),
+                    ]
+                )
+
+            # 3. Dynamic generic extraction for arbitrary numbered/bulleted/labelled guidelines
+            num_pattern = re.compile(
+                r'(?:^|\n)\s*(?:(\d+)[\.\)]|[•\-\*]|(?:Eligibility|Requirement|Criteria|Mandatory|Recommendation):?)\s*([^\n\r]+(?:must|shall|required|eligible|eligibility|should|recommend)[^\n\r]+)',
+                re.IGNORECASE,
+            )
+            num_matches = list(num_pattern.finditer(prompt))
+            if num_matches:
+                reqs = []
+                for idx, m in enumerate(num_matches, 1):
+                    content = m.group(2).strip()
+                    is_rec = "recommend" in content.lower() or "encourage" in content.lower() or "should" in content.lower()
+                    reqs.append(
+                        RequirementExtracted(
+                            id=f"REQ-{idx:03d}",
+                            text=content,
+                            type="recommendation" if is_rec else "mandatory",
+                            mandatory=not is_rec,
+                            category="eligibility" if "eligib" in content.lower() else "project",
+                            source_document="guideline",
+                            source_page=1,
+                            source_section="Guideline Requirements",
+                            source_excerpt=content,
+                        )
+                    )
+                if reqs:
+                    return schema(requirements=reqs)
+
+            # If no requirements can be extracted, return empty list (triggers zero-requirement failure handler)
+            return schema(requirements=[])
 
         elif schema == RequirementMappingResponse:
+            # 1. EcoSpark / Green Innovation Micro-Grant application
+            if "ecospark" in prompt.lower() or "hyderabad" in prompt.lower() or "solar-powered" in prompt.lower() or "450,000" in prompt.lower():
+                return schema(
+                    mappings=[
+                        RequirementMappingItem(
+                            requirement_id="REQ-001",
+                            status="SUPPORTED",
+                            evidence="Organization: EcoSpark Community Solutions Pvt. Ltd.\nLocation: Hyderabad, Telangana, India\nOrganization type: Private limited company\nYears operating: 3 years",
+                            source_document="application",
+                            source_page=1,
+                            source_section="Applicant Information",
+                            confidence=0.98,
+                            reasoning="Application draft specifies 3 years of operating history as a private limited company in Hyderabad, India, satisfying the 2-year eligibility requirement."
+                        ),
+                        RequirementMappingItem(
+                            requirement_id="REQ-002",
+                            status="SUPPORTED",
+                            evidence="We expect the project to reduce electricity consumption by approximately 20% and reduce annual carbon emissions by approximately 12 tonnes.",
+                            source_document="application",
+                            source_page=1,
+                            source_section="Environmental Benefit",
+                            confidence=0.90,
+                            reasoning="Application details expected 20% electricity reduction and 12 tonnes annual carbon reduction."
+                        ),
+                        RequirementMappingItem(
+                            requirement_id="REQ-003",
+                            status="WEAK",
+                            evidence="Budget\nSolar equipment: INR 280,000\nCooling equipment: INR 120,000\nInstallation: INR 50,000\nTotal: INR 450,000",
+                            source_document="application",
+                            source_page=1,
+                            source_section="Budget",
+                            confidence=0.82,
+                            reasoning="Requested funding of INR 450,000 is under the INR 500,000 cap, but the detailed project budget attachment is acknowledged as omitted in the draft."
+                        ),
+                        RequirementMappingItem(
+                            requirement_id="REQ-004",
+                            status="SUPPORTED",
+                            evidence="Implementation Plan\nMonth 1: finalize site and equipment selection.\nMonth 2: procure equipment and complete installation.\nMonth 3: commission the system and begin monitoring.",
+                            source_document="application",
+                            source_page=1,
+                            source_section="Implementation Plan",
+                            confidence=0.94,
+                            reasoning="A 3-month implementation timeline with specific monthly activity milestones and commissioning date is provided."
+                        ),
+                        RequirementMappingItem(
+                            requirement_id="REC-001",
+                            status="MISSING",
+                            evidence=None,
+                            source_document="application",
+                            source_page=None,
+                            source_section=None,
+                            confidence=0.95,
+                            reasoning="No baseline environmental data from the 12 months preceding the project was found in the application materials."
+                        ),
+                        RequirementMappingItem(
+                            requirement_id="REC-002",
+                            status="WEAK",
+                            evidence="commission the system and begin monitoring.",
+                            source_document="application",
+                            source_page=1,
+                            source_section="Implementation Plan",
+                            confidence=0.75,
+                            reasoning="Application notes monitoring will begin in Month 3 but does not detail the formal measurement framework, instruments, or verification metrics."
+                        ),
+                    ]
+                )
+
+            # 2. EcoFilter / CleanTech Horizon application
             return schema(
                 mappings=[
                     RequirementMappingItem(
@@ -132,10 +275,33 @@ class MockLLMClient(BaseLLMClient):
                         confidence=0.92,
                         reasoning="Letters of support from two distinct commercial utilities are explicitly referenced."
                     ),
+                    RequirementMappingItem(
+                        requirement_id="REQ-005",
+                        status="MISSING",
+                        evidence=None,
+                        source_document="application",
+                        source_page=None,
+                        source_section=None,
+                        confidence=0.90,
+                        reasoning="Proposal narrative does not include Section D risk assessment matrix with required mitigation protocols."
+                    ),
                 ]
             )
 
         elif schema == UnsupportedClaimResponse:
+            if "ecospark" in prompt.lower() or "hyderabad" in prompt.lower() or "20 similar" in prompt.lower():
+                return schema(
+                    claims=[
+                        UnsupportedClaimItem(
+                            claim="EcoSpark has successfully completed more than 20 similar sustainability projects for local institutions.",
+                            source_page=1,
+                            reason="No client references, completion certificates, or project portfolio are supplied to substantiate the claim of 20+ completed projects.",
+                            related_requirement="REQ-001",
+                            status="No supporting evidence found in supplied materials"
+                        )
+                    ]
+                )
+
             return schema(
                 claims=[
                     UnsupportedClaimItem(
@@ -149,6 +315,24 @@ class MockLLMClient(BaseLLMClient):
             )
 
         elif schema == ClarificationQuestionResponse:
+            if "ecospark" in prompt.lower() or "hyderabad" in prompt.lower() or "rec-001" in prompt.lower():
+                return schema(
+                    questions=[
+                        ClarificationQuestionItem(
+                            requirement_id="REQ-003",
+                            question="Please provide the itemized budget breakdown attachment and vendor quotations required by the funding guideline.",
+                            gap_type="WEAK",
+                            suggested_evidence="Itemized supplier quotation and detailed budget schedule."
+                        ),
+                        ClarificationQuestionItem(
+                            requirement_id="REC-001",
+                            question="Can you supply baseline utility electricity bills or measured energy consumption logs for the facility over the past 12 months?",
+                            gap_type="MISSING",
+                            suggested_evidence="12 months of electricity bills or third-party energy audit report."
+                        ),
+                    ]
+                )
+
             return schema(
                 questions=[
                     ClarificationQuestionItem(

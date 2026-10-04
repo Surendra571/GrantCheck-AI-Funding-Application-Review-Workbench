@@ -1,3 +1,4 @@
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Path
 from sqlalchemy.orm import Session
@@ -6,6 +7,9 @@ from app.database import get_db
 from app.models.document import DocumentVersion
 from app.schemas.assessment import DocumentVersionOut
 from app.services.versioning_service import VersioningService
+from app.logging import log_event
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/assessments/{assessment_id}/documents", tags=["Documents"])
 
@@ -39,6 +43,17 @@ async def upload_document(
             doc_type=doc_type,
             filename=file.filename or "uploaded_document",
             file_bytes=content,
+        )
+        log_event(
+            event="document_uploaded",
+            assessment_id=assessment_id,
+            document_id=new_doc.id,
+            details={
+                "doc_type": doc_type,
+                "filename": file.filename,
+                "version": new_doc.version_number,
+                "hash": new_doc.file_hash,
+            },
         )
         return new_doc
     except ValueError as e:
