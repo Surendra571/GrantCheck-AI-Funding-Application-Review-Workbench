@@ -154,9 +154,66 @@ When a document is replaced:
 ### Completeness Summary Report
 * `GET /api/assessments/{id}/summary`: Generates reviewed completeness report with deterministic score, unsupported claims, missing documents, clarification questions, and legal notice.
 
+### Public Production Health Endpoints
+* `GET /health`: Standard health check returning `{"status": "ok"}` for Render, load balancers, and monitoring.
+* `GET /`: Service metadata, version info, and regulatory disclaimer.
+* `GET /api/health`: API route health check.
+
 ---
 
-## 6. Local Setup & Running
+## 6. Public Production Cloud Deployment (Render & Vercel)
+
+The system is configured for continuous production deployment using **GitHub**, **Render** (FastAPI backend + PostgreSQL), and **Vercel** (React SPA frontend).
+
+### Production Architecture
+```text
+GitHub (Surendra571/GrantCheck-AI-Funding-Application-Review-Workbench)
+   │
+   ├─► Vercel (Frontend SPA: React + Vite + TypeScript)
+   │     │ (communicates over HTTPS via VITE_API_BASE_URL)
+   │     ▼
+   └─► Render Web Service (Backend: FastAPI + Uvicorn + Python 3.12)
+         │ (runs on 0.0.0.0:$PORT with Alembic migrations)
+         ▼
+       Render Managed PostgreSQL (Database: grantcheck-db)
+         │
+         ▼
+       Configured AI Provider (Server-side: Mock / Gemini / OpenAI)
+```
+
+### 1. Backend & Database Deployment on Render
+
+A zero-touch Infrastructure-as-Code Blueprint (`render.yaml`) is included in the root directory:
+
+1. Log in to [Render Dashboard](https://dashboard.render.com).
+2. Go to **Blueprints** → **New Blueprint Instance**.
+3. Connect repository: `https://github.com/Surendra571/GrantCheck-AI-Funding-Application-Review-Workbench`.
+4. Render will automatically detect `render.yaml` and provision:
+   - **`grantcheck-db`**: Free managed PostgreSQL database.
+   - **`grantcheck-api`**: Python Web Service running in `backend` directory.
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `python -m alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - Health Check Path: `/health`
+5. Set backend environment variables on Render:
+   - `LLM_PROVIDER`: `mock` (or `gemini` / `openai` with corresponding server-side API key)
+   - `FRONTEND_URL`: URL of the deployed Vercel frontend (e.g. `https://grantcheck-workbench.vercel.app`)
+
+### 2. Frontend Deployment on Vercel
+
+1. Log in to [Vercel](https://vercel.com).
+2. Click **Add New...** → **Project** and select `Surendra571/GrantCheck-AI-Funding-Application-Review-Workbench`.
+3. Configure project settings:
+   - **Framework Preset**: `Vite`
+   - **Root Directory**: `frontend`
+   - **Build Command**: `npm run build`
+   - **Output Directory**: `dist`
+4. Add Environment Variable:
+   - `VITE_API_BASE_URL`: `https://<your-render-backend-url>.onrender.com`
+5. Click **Deploy**. Vercel will build and publish the frontend with SPA client routing handled by `frontend/vercel.json`.
+
+---
+
+## 7. Local Setup & Running
 
 ### Prerequisites
 * Python 3.11+
