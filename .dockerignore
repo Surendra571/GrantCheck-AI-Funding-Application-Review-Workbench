@@ -1,0 +1,9 @@
+.git
+.venv
+__pycache__
+*.pyc
+node_modules
+frontend
+.pytest_cache
+uploads
+grantcheck.db
