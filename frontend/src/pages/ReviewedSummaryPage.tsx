@@ -132,7 +132,7 @@ export const ReviewedSummaryPage: React.FC<Props> = ({ assessmentId, onNavigate 
                 {score.completion_percentage.toFixed(1)}%
               </span>
               <span className="text-xs text-slate-300 font-medium">
-                ({score.mandatory_completed} of {score.total_mandatory} mandatory criteria satisfied)
+                ({score.completed} of {score.total_mandatory} mandatory criteria satisfied)
               </span>
             </div>
             <p className="text-xs text-slate-400 pt-1 leading-relaxed">
@@ -141,6 +141,10 @@ export const ReviewedSummaryPage: React.FC<Props> = ({ assessmentId, onNavigate 
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-xs shrink-0">
+            <div className="bg-white/10 p-2.5 rounded-lg border border-white/10">
+              <p className="text-slate-300 text-[10px] uppercase font-semibold">Incomplete</p>
+              <p className="text-lg font-bold text-rose-400 mt-0.5">{score.incomplete}</p>
+            </div>
             <div className="bg-white/10 p-2.5 rounded-lg border border-white/10">
               <p className="text-slate-300 text-[10px] uppercase font-semibold">Human Confirmed</p>
               <p className="text-lg font-bold text-teal-400 mt-0.5">
@@ -164,6 +168,12 @@ export const ReviewedSummaryPage: React.FC<Props> = ({ assessmentId, onNavigate 
               </p>
             </div>
           </div>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-slate-100 pt-3 text-xs">
+          <span className="font-semibold text-slate-700">Recommendations</span>
+          <span className="text-slate-600">
+            {score.recommendations_addressed} of {score.recommendations_total} addressed
+          </span>
         </div>
       </div>
 

@@ -5,12 +5,21 @@ import fitz  # PyMuPDF
 from docx import Document as DocxDocument
 
 class ParsedDocument:
-    def __init__(self, filename: str, file_hash: str, page_count: int, pages: List[Dict[str, Any]], full_text: str):
+    def __init__(
+        self,
+        filename: str,
+        file_hash: str,
+        page_count: int,
+        pages: List[Dict[str, Any]],
+        full_text: str,
+        has_physical_page_numbers: bool = True,
+    ):
         self.filename = filename
         self.file_hash = file_hash
         self.page_count = page_count
         self.pages = pages  # List of {"page_number": int, "text": str, "sections": List[str]}
         self.full_text = full_text
+        self.has_physical_page_numbers = has_physical_page_numbers
 
 class DocumentParser:
     @staticmethod
@@ -113,7 +122,8 @@ class DocumentParser:
             file_hash=file_hash,
             page_count=page_count,
             pages=pages,
-            full_text=full_text
+            full_text=full_text,
+            has_physical_page_numbers=False,
         )
 
     @classmethod
@@ -152,7 +162,8 @@ class DocumentParser:
             file_hash=file_hash,
             page_count=page_count,
             pages=pages,
-            full_text=full_text
+            full_text=full_text,
+            has_physical_page_numbers=False,
         )
 
     @staticmethod

@@ -57,7 +57,11 @@ class PipelineOrchestrator:
 
         # Step 8: Generate Clarification Questions
         logger.info("Step 8: Generating clarification questions...")
-        clarification_questions = self.question_gen.generate_questions(requirements, verified_mappings)
+        clarification_questions = self.question_gen.generate_questions(
+            requirements,
+            verified_mappings,
+            unsupported_claims,
+        )
 
         # Construct full audit snapshot
         snapshot = PipelineAuditSnapshot(

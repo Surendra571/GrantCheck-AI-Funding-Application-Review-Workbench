@@ -4,6 +4,10 @@ class DeterministicScoreBreakdown(BaseModel):
     total_requirements: int = 0
     total_mandatory: int = 0
     total_recommendations: int = 0
+    recommendations_total: int = 0
+    recommendations_addressed: int = 0
+    completed: int = 0
+    incomplete: int = 0
     mandatory_completed: int = 0
     mandatory_weak: int = 0
     mandatory_missing: int = 0

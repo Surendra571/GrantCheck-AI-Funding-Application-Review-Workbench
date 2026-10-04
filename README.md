@@ -163,19 +163,26 @@ When a document is replaced:
 * Node.js 18+ and npm
 * Docker & Docker Compose (optional for containerized deployment)
 
-### Option A: Running with Docker Compose (Recommended for Full Stack)
+### Option A: Local Evaluation with Docker Compose
+
+This Compose stack is a local evaluation setup, not a public production deployment: the API has no authentication or authorization, and Compose intentionally publishes services only on loopback. Do not expose these ports directly to an untrusted network. A public deployment needs an authenticated access layer, TLS termination, and operational controls for secrets, backups, and monitoring.
 
 ```bash
 # 1. Clone or navigate to the project directory
 cd GrantCheck-AI-Funding-Application-Review-Workbench
 
-# 2. Build and start containers (PostgreSQL, Backend, Frontend)
+# 2. Create local Compose settings and replace the placeholder password
+cp .env.example .env
+
+# 3. Build and start containers (PostgreSQL, Backend, Frontend)
 docker compose up --build -d
 
-# 3. Access the applications
-# Frontend Review Workbench: http://localhost:5173
+# 4. Access the applications
+# Frontend Review Workbench: http://localhost:3000
 # Backend API & Swagger Docs: http://localhost:8000/docs
 ```
+
+Compose binds published ports to `127.0.0.1`. Set `FRONTEND_HOST_PORT`, `BACKEND_HOST_PORT`, or `POSTGRES_HOST_PORT` in `.env` if those local ports are already in use. On first startup, the backend applies Alembic migrations before serving requests. The default provider is the deterministic mock; configure `LLM_PROVIDER` and the corresponding API key in `.env` to use a hosted provider. Keep `.env` private and do not commit it.
 
 To stop containers:
 ```bash
@@ -190,6 +197,11 @@ docker compose down
 ```bash
 # Navigate to backend directory
 cd backend
+
+# Optional local settings (default SQLite and mock provider work without this)
+# Copy the project template and adjust DATABASE_URL/LLM settings as needed:
+# Windows PowerShell: Copy-Item ..\.env.example .env
+# Linux/macOS: cp ../.env.example .env
 
 # Create virtual environment
 python -m venv .venv
@@ -231,8 +243,11 @@ Frontend will be live at `http://localhost:5173`.
 The test suite covers document parsing (PDF, DOCX, TXT), schema validations, deterministic scoring, reviewer actions, versioning, stale detection, unsupported claim rules, API routes, and a complete end-to-end user workflow.
 
 ```bash
-# Run all tests from project root
-backend/.venv/Scripts/python.exe -m pytest backend/tests -v
+# Windows PowerShell, from the project root
+backend\.venv\Scripts\python.exe -m pytest backend\tests -v
+
+# Linux/macOS, from the project root (after creating/activating backend/.venv)
+backend/.venv/bin/python -m pytest backend/tests -v
 
 # Or from backend directory:
 cd backend
@@ -244,10 +259,10 @@ python -m pytest tests -v
 * `test_schemas.py`: Pydantic model validation for requirements, mappings, unsupported claims, clarification questions.
 * `test_scoring.py`: Deterministic scoring rules, mandatory vs recommendation isolation, reviewer confirmation/correction/rejection overrides, edge cases.
 * `test_versioning_and_stale.py`: Version numbering ($v_1 \to v_2$), SHA-256 hash comparison, duplicate upload prevention, stale flagging on source modification.
-* `test_ai_services.py`: Requirement extraction, evidence mapping, citation preservation, evidence checker verification (**asserting claims are not declared false**), clarification question generator.
-* `test_api_endpoints.py`: Assessment lifecycle, file upload routes, review actions, supporting docs CRUD, HTTP error handling (400, 404, 409, 415, 422).
+* `test_ai_services.py` and `test_pipeline_and_validation.py`: Requirement extraction, evidence mapping, citation validation (including blank and fabricated evidence), unsupported claims (**never declared false**), malformed LLM responses, safe provider error logging, and clarification questions.
+* `test_api_endpoints.py`: Assessment lifecycle, file upload type/empty/size/duplicate handling, review actions, supporting docs CRUD, and HTTP errors (400, 404, 409, 413, 415, 422).
 * `test_e2e_workflow.py`: Complete lifecycle covering:
-  $$\text{Create} \to \text{Upload Guideline \& Application} \to \text{AI Analysis} \to \text{Reviewer Confirmation \& Correction} \to \text{Score Recalculation} \to \text{Document Update} \to \text{Stale Detection}$$
+  $$\text{Create} \to \text{Upload Guideline \& Application} \to \text{AI Analysis} \to \text{Confirm/Correct/Reject} \to \text{Deterministic Score} \to \text{Summary} \to \text{Update/Stale/Re-analyze}$$
 
 ---
 

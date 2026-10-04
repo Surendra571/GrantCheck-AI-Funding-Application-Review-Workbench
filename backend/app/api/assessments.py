@@ -1,4 +1,5 @@
 import os
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, Path
 from sqlalchemy.orm import Session
@@ -20,6 +21,8 @@ from app.schemas.assessment import (
 from app.services.llm_client import get_llm_client
 from app.services.pipeline_orchestrator import PipelineOrchestrator
 from app.services.scoring_service import ScoringService
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/assessments", tags=["Assessments"])
 
@@ -268,9 +271,18 @@ def _execute_pipeline_for_assessment(assessment: Assessment, g_doc: DocumentVers
         db.refresh(assessment)
 
     except Exception as e:
+        db.rollback()
         assessment.status = "ERROR"
         db.commit()
-        raise HTTPException(status_code=500, detail=f"Pipeline analysis execution failed: {str(e)}")
+        logger.error(
+            "Pipeline analysis failed for assessment %s (%s)",
+            assessment.id,
+            type(e).__name__,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail="Pipeline analysis execution failed. Check server logs for the failure type.",
+        ) from None
 
 @router.post("/{id}/analyze", response_model=AssessmentDetailOut)
 def analyze_assessment(id: str = Path(..., description="Assessment UUID"), db: Session = Depends(get_db)):

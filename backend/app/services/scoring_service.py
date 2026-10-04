@@ -16,28 +16,6 @@ class ScoringService:
         requirements: List[Requirement],
         supporting_docs: List[SupportingDocument] = None
     ) -> DeterministicScoreBreakdown:
-        if not requirements:
-            total_docs = len(supporting_docs or [])
-            supplied_docs = sum(1 for d in (supporting_docs or []) if d.is_required and d.is_supplied)
-            req_docs = sum(1 for d in (supporting_docs or []) if d.is_required)
-            return DeterministicScoreBreakdown(
-                total_requirements=0,
-                total_mandatory=0,
-                total_recommendations=0,
-                mandatory_completed=0,
-                mandatory_weak=0,
-                mandatory_missing=0,
-                mandatory_ambiguous=0,
-                confirmed_count=0,
-                corrected_count=0,
-                rejected_count=0,
-                pending_count=0,
-                completion_percentage=0.0,
-                total_required_docs=req_docs,
-                supplied_required_docs=supplied_docs,
-                missing_required_docs=req_docs - supplied_docs,
-            )
-
         total_reqs = len(requirements)
         mandatory_reqs = [r for r in requirements if r.mandatory]
         recommendation_reqs = [r for r in requirements if not r.mandatory]
@@ -49,6 +27,7 @@ class ScoringService:
         mandatory_weak = 0
         mandatory_missing = 0
         mandatory_ambiguous = 0
+        recommendations_addressed = 0
 
         confirmed_count = 0
         corrected_count = 0
@@ -78,11 +57,13 @@ class ScoringService:
                     mandatory_ambiguous += 1
                 else:  # MISSING or unknown
                     mandatory_missing += 1
+            elif eff_status == "SUPPORTED":
+                recommendations_addressed += 1
 
         if total_mandatory > 0:
-            completion_pct = round((mandatory_completed / total_mandatory) * 100.0, 2)
+            completion_pct = round((mandatory_completed / total_mandatory) * 100.0, 1)
         else:
-            completion_pct = 100.0
+            completion_pct = 0.0
 
         # Supporting docs breakdown
         docs = supporting_docs or []
@@ -94,6 +75,10 @@ class ScoringService:
             total_requirements=total_reqs,
             total_mandatory=total_mandatory,
             total_recommendations=total_recommendations,
+            recommendations_total=total_recommendations,
+            recommendations_addressed=recommendations_addressed,
+            completed=mandatory_completed,
+            incomplete=total_mandatory - mandatory_completed,
             mandatory_completed=mandatory_completed,
             mandatory_weak=mandatory_weak,
             mandatory_missing=mandatory_missing,

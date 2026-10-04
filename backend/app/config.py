@@ -1,7 +1,7 @@
 import os
-from typing import List, Union
+from typing import List, Union, Any
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field
+from pydantic import Field, field_validator
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -11,6 +11,17 @@ class Settings(BaseSettings):
     APP_ENV: str = "development"
     DEBUG: Union[bool, str] = True
     LOG_LEVEL: str = "INFO"
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, v: Any) -> Any:
+        if isinstance(v, str):
+            if v.lower() in ("true", "1", "yes", "on", "t"):
+                return True
+            if v.lower() in ("false", "0", "no", "off", "f"):
+                return False
+            return v
+        return v
 
     # Regulatory Disclaimer
     REGULATORY_DISCLAIMER: str = (

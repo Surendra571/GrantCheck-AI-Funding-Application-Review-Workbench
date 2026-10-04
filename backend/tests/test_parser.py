@@ -1,5 +1,6 @@
 import os
 import pytest
+import fitz
 from app.services.parser import DocumentParser
 
 samples_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "app", "samples")
@@ -34,6 +35,26 @@ def test_parse_docx_sample():
 def test_empty_document_error():
     with pytest.raises(ValueError, match="Empty document"):
         DocumentParser.parse(b"", "empty.txt")
+
+
+def test_whitespace_only_text_document_error():
+    with pytest.raises(ValueError, match="is empty"):
+        DocumentParser.parse(b" \r\n\t", "whitespace.txt")
+
+
+def test_pdf_without_extractable_text_error():
+    pdf = fitz.open()
+    pdf.new_page()
+    pdf_bytes = pdf.tobytes()
+    pdf.close()
+
+    with pytest.raises(ValueError, match="contains no extractable text"):
+        DocumentParser.parse(pdf_bytes, "image_only.pdf")
+
+
+def test_corrupted_docx_error():
+    with pytest.raises(ValueError, match="Corrupted or invalid DOCX"):
+        DocumentParser.parse(b"not a DOCX archive", "corrupted.docx")
 
 def test_unsupported_file_type_error():
     with pytest.raises(ValueError, match="Unsupported file format"):

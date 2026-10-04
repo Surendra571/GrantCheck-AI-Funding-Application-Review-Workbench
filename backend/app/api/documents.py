@@ -1,6 +1,7 @@
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form, Path
 from sqlalchemy.orm import Session
+from app.config import settings
 from app.database import get_db
 from app.models.document import DocumentVersion
 from app.schemas.assessment import DocumentVersionOut
@@ -21,12 +22,18 @@ async def upload_document(
             detail=f"Invalid doc_type '{doc_type}'. Allowed: 'guideline', 'application', 'supporting'."
         )
 
-    content = await file.read()
+    max_bytes = settings.MAX_UPLOAD_SIZE_MB * 1024 * 1024
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Uploaded file exceeds the {settings.MAX_UPLOAD_SIZE_MB} MB limit.",
+        )
     if not content:
         raise HTTPException(status_code=400, detail="Uploaded file is empty.")
 
     try:
-        new_doc, _ = VersioningService.register_document(
+        new_doc = VersioningService.register_document(
             db=db,
             assessment_id=assessment_id,
             doc_type=doc_type,

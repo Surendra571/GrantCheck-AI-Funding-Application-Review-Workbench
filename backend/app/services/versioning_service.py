@@ -1,5 +1,4 @@
 import os
-from typing import Tuple
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 from app.config import settings
@@ -16,16 +15,11 @@ class VersioningService:
         doc_type: str,
         filename: str,
         file_bytes: bytes
-    ) -> Tuple[DocumentVersion, bool]:
+    ) -> DocumentVersion:
         """
         Uploads and registers a document version.
-        Returns (DocumentVersion, is_new_version: bool).
-        Rules:
-        1. Calculate SHA-256
-        2. Compare against the latest version
-        3. If unchanged, do not create a duplicate version (return existing latest)
-        4. If changed, create a new version (never delete previous versions)
-        5. Mark assessments using the old version as stale
+        Duplicate content is rejected; changed content creates a new version
+        while preserving the previous version and marking the assessment stale.
         """
         assessment = db.query(Assessment).filter(Assessment.id == assessment_id).first()
         if not assessment:
@@ -45,19 +39,20 @@ class VersioningService:
             .first()
         )
 
-        if latest_doc:
-            # 3. If unchanged, do not create a duplicate version
-            if latest_doc.file_hash == file_hash:
-                return latest_doc, False
+        if latest_doc and latest_doc.file_hash == file_hash:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Duplicate upload: content matches active {doc_type} version {latest_doc.version_number}.",
+            )
 
-            # 4. If changed, create a new version (preserve old versions)
+        # Parse before changing the active version so invalid input has no side effects.
+        parsed = DocumentParser.parse(file_bytes, filename)
+
+        if latest_doc:
             latest_doc.is_active = False
             next_version = latest_doc.version_number + 1
         else:
             next_version = 1
-
-        # Parse document to determine page count
-        parsed = DocumentParser.parse(file_bytes, filename)
 
         # Save to disk storage
         os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
@@ -88,7 +83,7 @@ class VersioningService:
         db.refresh(new_doc)
         db.refresh(assessment)
 
-        return new_doc, True
+        return new_doc
 
     @classmethod
     def check_and_update_stale_status(cls, db: Session, assessment: Assessment) -> bool:
@@ -130,5 +125,5 @@ class VersioningService:
 
         if is_stale:
             assessment.is_stale = True
-            assessment.stale_reason = "Assessment is stale because a source document changed."
+            assessment.stale_reason = "Assessment stale — source document changed. " + "; ".join(reasons)
         return is_stale

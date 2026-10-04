@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   db:
     image: postgres:16-alpine
@@ -8,13 +6,13 @@ services:
     environment:
       POSTGRES_DB: grantcheck
       POSTGRES_USER: grantcheck
-      POSTGRES_PASSWORD: grantcheck_secret
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the project .env file}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U grantcheck -d grantcheck"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -29,14 +27,28 @@ services:
       db:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql://grantcheck:grantcheck_secret@db:5432/grantcheck
-      LLM_PROVIDER: mock
+      DATABASE_URL: postgresql://${POSTGRES_USER:-grantcheck}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the project .env file}@db:5432/${POSTGRES_DB:-grantcheck}
+      LLM_PROVIDER: ${LLM_PROVIDER:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      LLM_TIMEOUT_SECONDS: ${LLM_TIMEOUT_SECONDS:-60}
+      LLM_MAX_RETRIES: ${LLM_MAX_RETRIES:-3}
       APP_ENV: production
       LOG_LEVEL: INFO
+      UPLOAD_DIR: /app/uploads
+      MAX_UPLOAD_SIZE_MB: ${MAX_UPLOAD_SIZE_MB:-25}
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${BACKEND_HOST_PORT:-8000}:8000"
     volumes:
       - ./backend/uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8000/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
   frontend:
     build:
@@ -45,9 +57,10 @@ services:
     container_name: grantcheck-frontend
     restart: unless-stopped
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
-      - "3000:80"
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-3000}:80"
 
 volumes:
   postgres_data:

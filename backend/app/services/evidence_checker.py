@@ -1,7 +1,11 @@
+import logging
+import re
 from typing import List
 from app.services.parser import ParsedDocument
 from app.services.llm_client import BaseLLMClient
 from app.schemas.ai import RequirementExtracted, RequirementMappingItem, UnsupportedClaimItem, UnsupportedClaimResponse
+
+logger = logging.getLogger(__name__)
 
 class EvidenceChecker:
     SYSTEM_PROMPT = (
@@ -25,6 +29,27 @@ class EvidenceChecker:
             f"{application_doc.full_text[:12000]}"
         )
         res = self.llm.generate_structured(prompt, self.SYSTEM_PROMPT, UnsupportedClaimResponse)
+        normalized_pages = {
+            page["page_number"]: " ".join(re.findall(r"\b\w+\b", page["text"].lower()))
+            for page in application_doc.pages
+        }
+        verified_claims = []
         for c in res.claims:
+            normalized_claim = " ".join(re.findall(r"\b\w+\b", c.claim.lower()))
+            matching_pages = [
+                page_number
+                for page_number, page_text in normalized_pages.items()
+                if normalized_claim and normalized_claim in page_text
+            ]
+            if not matching_pages:
+                logger.warning(
+                    "Discarding unsupported claim because its text is absent from application %s",
+                    application_doc.filename,
+                )
+                continue
+
+            if c.source_page not in matching_pages:
+                c.source_page = matching_pages[0]
             c.status = "No supporting evidence found in supplied materials"
-        return res.claims
+            verified_claims.append(c)
+        return verified_claims

@@ -38,6 +38,10 @@ export interface ScoreBreakdown {
   total_requirements: number;
   total_mandatory: number;
   total_recommendations: number;
+  recommendations_total: number;
+  recommendations_addressed: number;
+  completed: number;
+  incomplete: number;
   mandatory_completed: number;
   mandatory_weak: number;
   mandatory_missing: number;

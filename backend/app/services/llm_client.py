@@ -55,14 +55,14 @@ class MockLLMClient(BaseLLMClient):
                     ),
                     RequirementExtracted(
                         id="REQ-003",
-                        text="Projects must achieve minimum 40% reduction in carbon emissions verified by life-cycle analysis.",
+                        text="Projects must achieve a minimum 40% reduction in carbon emissions verified by life-cycle analysis.",
                         type="mandatory",
                         mandatory=True,
                         category="project",
                         source_document="guideline",
-                        source_page=2,
-                        source_section="3. Technical Impact",
-                        source_excerpt="Projects must achieve minimum 40% reduction in carbon emissions verified by life-cycle analysis."
+                        source_page=1,
+                        source_section="3. Technical & Environmental Impact",
+                        source_excerpt="Projects must achieve a minimum 40% reduction in carbon emissions verified by life-cycle analysis."
                     ),
                     RequirementExtracted(
                         id="REQ-004",
@@ -71,9 +71,20 @@ class MockLLMClient(BaseLLMClient):
                         mandatory=False,
                         category="recommendation",
                         source_document="guideline",
-                        source_page=2,
-                        source_section="4. Partner Validation",
+                        source_page=1,
+                        source_section="4. Commercial Partner Validation",
                         source_excerpt="Applicants should provide letters of support from at least two commercial pilot partners."
+                    ),
+                    RequirementExtracted(
+                        id="REQ-005",
+                        text="A full risk assessment matrix identifying at least five technological and market risks with mitigation protocols must be included in Section D of the proposal narrative.",
+                        type="mandatory",
+                        mandatory=True,
+                        category="submission",
+                        source_document="guideline",
+                        source_page=1,
+                        source_section="5. Risk Assessment & Governance",
+                        source_excerpt="A full risk assessment matrix identifying at least five technological and market risks with mitigation protocols must be included in Section D of the proposal narrative."
                     ),
                 ]
             )
@@ -106,7 +117,7 @@ class MockLLMClient(BaseLLMClient):
                         status="WEAK",
                         evidence="Our pilot data indicates an estimated 35-45% decrease in plant greenhouse emissions.",
                         source_document="application",
-                        source_page=2,
+                        source_page=1,
                         source_section="Environmental Impact",
                         confidence=0.82,
                         reasoning="Application claims 35-45% reduction but provides no formal third-party life-cycle analysis."
@@ -116,7 +127,7 @@ class MockLLMClient(BaseLLMClient):
                         status="SUPPORTED",
                         evidence="Two letters of intent are attached from Yorkshire Water and Northumbrian Water plc.",
                         source_document="application",
-                        source_page=3,
+                        source_page=1,
                         source_section="Commercial Partners",
                         confidence=0.92,
                         reasoning="Letters of support from two distinct commercial utilities are explicitly referenced."
@@ -129,7 +140,7 @@ class MockLLMClient(BaseLLMClient):
                 claims=[
                     UnsupportedClaimItem(
                         claim="Our membrane technology reduces filtration energy consumption by 65% compared to all market alternatives.",
-                        source_page=2,
+                        source_page=1,
                         reason="No comparative benchmark laboratory data or independent test reports are supplied.",
                         related_requirement="REQ-003",
                         status="No supporting evidence found in supplied materials"
@@ -183,9 +194,16 @@ class OpenAILLMClient(BaseLLMClient):
                     raise ValueError("OpenAI returned null structured output.")
                 return parsed
             except Exception as e:
-                logger.warning(f"OpenAI call attempt {attempt+1}/{max_retries} failed: {e}")
+                logger.warning(
+                    "OpenAI call attempt %s/%s failed (%s)",
+                    attempt + 1,
+                    max_retries,
+                    type(e).__name__,
+                )
                 if attempt == max_retries - 1:
-                    raise RuntimeError(f"OpenAI LLM failure after {max_retries} attempts: {str(e)}")
+                    raise RuntimeError(
+                        f"OpenAI LLM failure after {max_retries} attempts."
+                    ) from None
                 time.sleep(delay)
                 delay *= 2.0
 
@@ -210,16 +228,29 @@ class GeminiLLMClient(BaseLLMClient):
                 data = json.loads(text)
                 return schema.model_validate(data)
             except Exception as e:
-                logger.warning(f"Gemini call attempt {attempt+1}/{max_retries} failed: {e}")
+                logger.warning(
+                    "Gemini call attempt %s/%s failed (%s)",
+                    attempt + 1,
+                    max_retries,
+                    type(e).__name__,
+                )
                 if attempt == max_retries - 1:
-                    raise RuntimeError(f"Gemini LLM failure after {max_retries} attempts: {str(e)}")
+                    raise RuntimeError(
+                        f"Gemini LLM failure after {max_retries} attempts."
+                    ) from None
                 time.sleep(delay)
                 delay *= 2.0
 
 def get_llm_client() -> BaseLLMClient:
     provider = settings.LLM_PROVIDER.lower().strip()
-    if provider == "openai" and settings.OPENAI_API_KEY:
+    if provider == "openai":
+        if not settings.OPENAI_API_KEY:
+            raise RuntimeError("LLM_PROVIDER=openai requires OPENAI_API_KEY to be configured.")
         return OpenAILLMClient(api_key=settings.OPENAI_API_KEY, model=settings.OPENAI_MODEL)
-    elif provider == "gemini" and settings.GEMINI_API_KEY:
+    if provider == "gemini":
+        if not settings.GEMINI_API_KEY:
+            raise RuntimeError("LLM_PROVIDER=gemini requires GEMINI_API_KEY to be configured.")
         return GeminiLLMClient(api_key=settings.GEMINI_API_KEY, model=settings.GEMINI_MODEL)
-    return MockLLMClient()
+    if provider == "mock":
+        return MockLLMClient()
+    raise ValueError(f"Unsupported LLM_PROVIDER '{provider}'. Expected mock, openai, or gemini.")
